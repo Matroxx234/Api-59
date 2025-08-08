@@ -1,0 +1,51 @@
+// getAssets.js
+const express = require('express');
+const axios = require('axios');
+const app = express();
+
+app.get('/get-assets', async (req, res) => {
+  const userId = req.query.userid;
+  if (!userId) return res.status(400).json({ error: 'UserID manquant' });
+
+  try {
+    // Récupérer les vêtements (shirts & pants)
+    const catalogUrl = `https://catalog.roblox.com/v1/search/items/details?Category=Clothing&Subcategory=Shirts,Pants&CreatorTargetId=${userId}&SortType=3&Limit=30`;
+    const catalogRes = await axios.get(catalogUrl);
+    const items = catalogRes.data.data;
+
+    // Récupérer les gamepasses (nécessite les jeux du joueur)
+    const gamesUrl = `https://games.roblox.com/v2/users/${userId}/games?limit=10&sortOrder=Asc`;
+    const gamesRes = await axios.get(gamesUrl);
+    const gamepasses = [];
+
+    for (const game of gamesRes.data.data) {
+      const gpUrl = `https://games.roblox.com/v1/games/${game.id}/game-passes`;
+      const gpRes = await axios.get(gpUrl);
+      const passes = gpRes.data.data;
+
+      for (const pass of passes) {
+        if (pass.creator.id == userId && pass.price > 0) {
+          gamepasses.push({
+            name: pass.name,
+            id: pass.id,
+            price: pass.price
+          });
+        }
+      }
+    }
+
+    res.json({
+      userId,
+      shirtsAndPants: items,
+      gamepasses
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de la récupération des assets' });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('API en ligne sur le port 3000');
+});
